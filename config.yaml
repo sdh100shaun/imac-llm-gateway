@@ -1,0 +1,26 @@
+model_list:
+  # Primary: local Qwen coding model via Ollama
+  - model_name: "qwen-coder"
+    litellm_params:
+      model: "ollama_chat/qwen2.5-coder:14b"
+      api_base: "http://host.docker.internal:11434"
+      keep_alive: "10m"
+
+  # Fallback: Anthropic Claude Sonnet
+  - model_name: "claude-fallback"
+    litellm_params:
+      model: "claude-sonnet-4-6"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+litellm_settings:
+  # Automatically fall back to Claude when Qwen fails
+  fallbacks:
+    - {"qwen-coder": ["claude-fallback"]}
+  num_retries: 2
+  request_timeout: 60
+  drop_params: true
+
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  port: 4000
+  host: "0.0.0.0"

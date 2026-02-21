@@ -165,7 +165,7 @@ docker compose up -d ollama
 
 info "Waiting for Ollama to be ready..."
 for i in $(seq 1 30); do
-  if docker compose exec -T ollama curl -sf http://localhost:11434 &>/dev/null; then
+  if docker compose exec -T ollama ollama list &>/dev/null; then
     success "Ollama is ready."
     break
   fi

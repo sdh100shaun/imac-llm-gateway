@@ -3,7 +3,7 @@ model_list:
   - model_name: "qwen-coder"
     litellm_params:
       model: "ollama_chat/qwen2.5-coder:14b"
-      api_base: "http://ollama:11434"
+      api_base: "http://host.docker.internal:11434"
       keep_alive: "10m"
 
   # Fallback: Anthropic Claude Sonnet

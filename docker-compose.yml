@@ -1,4 +1,5 @@
 services:
+<<<<<<< HEAD
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
@@ -14,6 +15,8 @@ services:
       retries: 10
       start_period: 20s
 
+=======
+>>>>>>> parent of 090f96f (modified for docker)
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
@@ -24,9 +27,9 @@ services:
     env_file:
       - .env
     command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
-    depends_on:
-      ollama:
-        condition: service_healthy
+    # Allows the container to reach Ollama running natively on the host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 15s
@@ -34,6 +37,3 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
-
-volumes:
-  ollama_data:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup.sh — One-shot setup for LiteLLM gateway on iMac
-# Runs both Ollama and LiteLLM in Docker Compose.
+# Installs Ollama (native), pulls qwen2.5-coder:14b, and starts LiteLLM via Docker Compose.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,13 +26,53 @@ info "Checking prerequisites..."
 
 [[ "$(uname)" == "Darwin" ]] || error "This script is designed for macOS."
 
+require_cmd brew  "Install Homebrew from https://brew.sh first."
 require_cmd docker "Install Docker Desktop from https://www.docker.com/products/docker-desktop/ first."
 
 docker info &>/dev/null || error "Docker Desktop is not running. Please start it and re-run this script."
 success "Prerequisites OK."
 
 ###############################################################################
-# 2. Set up .env
+# 2. Install Ollama
+###############################################################################
+if command -v ollama &>/dev/null; then
+  success "Ollama already installed ($(ollama --version 2>/dev/null | head -1))."
+else
+  info "Installing Ollama via Homebrew..."
+  brew install ollama
+  success "Ollama installed."
+fi
+
+###############################################################################
+# 3. Start Ollama
+###############################################################################
+if pgrep -x ollama &>/dev/null; then
+  success "Ollama is already running."
+else
+  info "Starting Ollama..."
+  brew services start ollama 2>/dev/null || (ollama serve &>/dev/null & sleep 3)
+  # Give it a moment to bind to port 11434
+  sleep 3
+  if ! curl -sf http://localhost:11434 &>/dev/null; then
+    warn "Ollama may not have started yet — continuing anyway."
+  else
+    success "Ollama is running at http://localhost:11434."
+  fi
+fi
+
+###############################################################################
+# 4. Pull Qwen coding model (~8 GB, may take a while)
+###############################################################################
+if ollama list 2>/dev/null | grep -q "qwen2.5-coder:14b"; then
+  success "Model '$QWEN_MODEL' already present."
+else
+  info "Pulling '$QWEN_MODEL' — this may take several minutes (~8 GB)..."
+  ollama pull "$QWEN_MODEL"
+  success "Model '$QWEN_MODEL' downloaded."
+fi
+
+###############################################################################
+# 5. Set up .env
 ###############################################################################
 ENV_FILE="$SCRIPT_DIR/.env"
 ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
@@ -48,6 +88,7 @@ fi
 if grep -q "^ANTHROPIC_API_KEY=sk-ant-\.\.\." "$ENV_FILE" || grep -q "^ANTHROPIC_API_KEY=$" "$ENV_FILE"; then
   read -rp "Enter your Anthropic API key (or press Enter to skip): " ANTHROPIC_KEY
   if [[ -n "$ANTHROPIC_KEY" ]]; then
+    # macOS-compatible sed (in-place with empty backup extension)
     sed -i '' "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_KEY}|" "$ENV_FILE"
     success "ANTHROPIC_API_KEY set."
   else
@@ -66,7 +107,7 @@ if grep -q "^LITELLM_MASTER_KEY=sk-dvsa-local-master-key" "$ENV_FILE"; then
 fi
 
 ###############################################################################
-# 3. Write config.yaml (if not already present)
+# 6. Write config.yaml (if not already present)
 ###############################################################################
 CONFIG_FILE="$SCRIPT_DIR/config.yaml"
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -78,7 +119,7 @@ model_list:
   - model_name: "qwen-coder"
     litellm_params:
       model: "ollama_chat/qwen2.5-coder:14b"
-      api_base: "http://ollama:11434"
+      api_base: "http://host.docker.internal:11434"
       keep_alive: "10m"
 
   - model_name: "claude-fallback"
@@ -102,7 +143,7 @@ YAML
 fi
 
 ###############################################################################
-# 4. Write docker-compose.yml (if not already present)
+# 7. Write docker-compose.yml (if not already present)
 ###############################################################################
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 if [[ -f "$COMPOSE_FILE" ]]; then
@@ -111,21 +152,6 @@ else
   info "Writing docker-compose.yml..."
   cat > "$COMPOSE_FILE" <<'YAML'
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
@@ -136,9 +162,8 @@ services:
     env_file:
       - .env
     command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
-    depends_on:
-      ollama:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 15s
@@ -146,14 +171,12 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
-
-volumes:
-  ollama_data:
 YAML
   success "docker-compose.yml written."
 fi
 
 ###############################################################################
+<<<<<<< HEAD
 # 5. Start Ollama container and pull model
 ###############################################################################
 cd "$SCRIPT_DIR"
@@ -186,13 +209,18 @@ fi
 
 ###############################################################################
 # 6. Start LiteLLM
+=======
+# 8. Start LiteLLM via Docker Compose
+>>>>>>> parent of 090f96f (modified for docker)
 ###############################################################################
 info "Starting LiteLLM container..."
+cd "$SCRIPT_DIR"
+docker compose pull --quiet
 docker compose up -d
 success "LiteLLM container started."
 
 ###############################################################################
-# 7. Health check — wait for LiteLLM to be ready
+# 9. Health check — wait for LiteLLM to be ready
 ###############################################################################
 info "Waiting for LiteLLM to be healthy (up to 60s)..."
 for i in $(seq 1 20); do
@@ -207,7 +235,7 @@ for i in $(seq 1 20); do
 done
 
 ###############################################################################
-# 8. Print summary
+# 10. Print summary
 ###############################################################################
 MASTER_KEY=$(grep "^LITELLM_MASTER_KEY=" "$ENV_FILE" | cut -d= -f2-)
 
@@ -216,8 +244,7 @@ echo "======================================================"
 echo "  LLM Gateway Setup Complete"
 echo "======================================================"
 echo "  Gateway URL  : http://localhost:${LITELLM_PORT}"
-echo "  Ollama URL   : http://localhost:11434"
-echo "  Primary model: qwen2.5-coder:14b (Ollama in Docker)"
+echo "  Primary model: qwen2.5-coder:14b (via Ollama)"
 echo "  Fallback     : claude-sonnet-4-6 (Anthropic)"
 echo "  Master key   : ${MASTER_KEY}"
 echo ""
@@ -234,8 +261,7 @@ echo "    -H \"Authorization: Bearer ${MASTER_KEY}\" \\"
 echo "    -d '{\"model\": \"qwen-coder\", \"messages\": [{\"role\": \"user\", \"content\": \"Write a Python hello world\"}]}'"
 echo ""
 echo "  # Manage:"
-echo "  ./start.sh              — start gateway"
-echo "  ./stop.sh               — stop gateway"
-echo "  docker compose logs -f  — view logs"
-echo "  docker compose exec ollama ollama list  — list models"
+echo "  ./start.sh   — start gateway"
+echo "  ./stop.sh    — stop gateway"
+echo "  docker compose logs -f — view logs"
 echo "======================================================"

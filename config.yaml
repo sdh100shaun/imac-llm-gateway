@@ -1,26 +1,67 @@
-model_list:
-  # Primary: local Qwen coding model via Ollama
-  - model_name: "qwen-coder"
-    litellm_params:
-      model: "ollama_chat/qwen2.5-coder:14b"
-      api_base: "http://host.docker.internal:11434"
-      keep_alive: "10m"
+model_list:model_list:
 
-  # Fallback: Anthropic Claude Sonnet
-  - model_name: "claude-fallback"
-    litellm_params:
+  - model_name: "qwen-coder"  # Primary: local Qwen coding model via Ollama
+
+    litellm_params:  - model_name: "qwen-coder"
+
+      model: "ollama_chat/qwen2.5-coder:14b"    litellm_params:
+
+      api_base: "http://host.docker.internal:11434"      model: "ollama_chat/qwen2.5-coder:14b"
+
+      keep_alive: "10m"      api_base: "http://host.docker.internal:11434"
+
+      stream: true      keep_alive: "10m"
+
+      temperature: 0.1
+
+      max_tokens: 4096  # Fallback: Anthropic Claude Sonnet
+
+      top_p: 0.9  - model_name: "claude-fallback"
+
+      request_timeout: 300    litellm_params:
+
       model: "claude-sonnet-4-6"
-      api_key: "os.environ/ANTHROPIC_API_KEY"
 
-litellm_settings:
-  # Automatically fall back to Claude when Qwen fails
-  fallbacks:
+  - model_name: "claude-fallback"      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+    litellm_params:
+
+      model: "claude-3-5-sonnet-20241022"litellm_settings:
+
+      api_key: "os.environ/ANTHROPIC_API_KEY"  # Automatically fall back to Claude when Qwen fails
+
+      max_tokens: 4096  fallbacks:
+
     - {"qwen-coder": ["claude-fallback"]}
-  num_retries: 2
-  request_timeout: 60
-  drop_params: true
+
+litellm_settings:  num_retries: 2
+
+  fallbacks:  request_timeout: 60
+
+    - {"qwen-coder": ["claude-fallback"]}  drop_params: true
+
+  num_retries: 3
+
+  request_timeout: 300general_settings:
+
+  drop_params: true  master_key: "os.environ/LITELLM_MASTER_KEY"
+
+  cache:  port: 4000
+
+    type: "redis"  host: "0.0.0.0"
+
+    host: "localhost"
+    port: 6379
+    ttl: 3600
+  success_callback: ["cache"]
+  failure_callback: ["langfuse"]
+  set_verbose: false
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   port: 4000
   host: "0.0.0.0"
+  database_url: "sqlite:///app/litellm.db"
+  store_model_in_db: true
+  max_budget: 100
+  budget_duration: "30d"

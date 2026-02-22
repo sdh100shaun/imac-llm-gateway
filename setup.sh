@@ -121,23 +121,41 @@ model_list:
       model: "ollama_chat/qwen2.5-coder:14b"
       api_base: "http://host.docker.internal:11434"
       keep_alive: "10m"
+      stream: true
+      temperature: 0.1
+      max_tokens: 4096
+      top_p: 0.9
+      request_timeout: 300
 
   - model_name: "claude-fallback"
     litellm_params:
-      model: "claude-sonnet-4-6"
+      model: "claude-3-5-sonnet-20241022"
       api_key: "os.environ/ANTHROPIC_API_KEY"
+      max_tokens: 4096
 
 litellm_settings:
   fallbacks:
     - {"qwen-coder": ["claude-fallback"]}
-  num_retries: 2
-  request_timeout: 60
+  num_retries: 3
+  request_timeout: 300
   drop_params: true
+  cache:
+    type: "redis"
+    host: "localhost"
+    port: 6379
+    ttl: 3600
+  success_callback: ["cache"]
+  failure_callback: ["langfuse"]
+  set_verbose: false
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   port: 4000
   host: "0.0.0.0"
+  database_url: "sqlite:///app/litellm.db"
+  store_model_in_db: true
+  max_budget: 100
+  budget_duration: "30d"
 YAML
   success "config.yaml written."
 fi
@@ -152,6 +170,21 @@ else
   info "Writing docker-compose.yml..."
   cat > "$COMPOSE_FILE" <<'YAML'
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: litellm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
@@ -164,6 +197,9 @@ services:
     command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 15s
@@ -171,6 +207,10 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
 YAML
   success "docker-compose.yml written."
 fi
@@ -245,7 +285,8 @@ echo "  LLM Gateway Setup Complete"
 echo "======================================================"
 echo "  Gateway URL  : http://localhost:${LITELLM_PORT}"
 echo "  Primary model: qwen2.5-coder:14b (via Ollama)"
-echo "  Fallback     : claude-sonnet-4-6 (Anthropic)"
+echo "  Fallback     : claude-3-5-sonnet-20241022 (Anthropic)"
+echo "  Redis cache  : enabled on port 6379"
 echo "  Master key   : ${MASTER_KEY}"
 echo ""
 echo "  Test commands:"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # setup.sh — One-shot setup for LiteLLM gateway on iMac
-# Installs Ollama (native), pulls qwen2.5-coder:14b, and starts LiteLLM via Docker Compose.
+# Installs Ollama (native), pulls qwen2.5-coder:7b, and starts LiteLLM via Docker Compose.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-QWEN_MODEL="qwen2.5-coder:14b"
+QWEN_MODEL="qwen2.5-coder:7b"
 LITELLM_PORT=4000
 
 ###############################################################################
@@ -63,7 +63,7 @@ fi
 ###############################################################################
 # 4. Pull Qwen coding model (~8 GB, may take a while)
 ###############################################################################
-if ollama list 2>/dev/null | grep -q "qwen2.5-coder:14b"; then
+if ollama list 2>/dev/null | grep -q "qwen2.5-coder7b"; then
   success "Model '$QWEN_MODEL' already present."
 else
   info "Pulling '$QWEN_MODEL' — this may take several minutes (~8 GB)..."

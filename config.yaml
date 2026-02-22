@@ -1,0 +1,32 @@
+model_list:
+  - model_name: "qwen-coder"
+    litellm_params:
+      model: "ollama_chat/qwen2.5-coder:7b"
+      api_base: "http://host.docker.internal:11434"
+      keep_alive: "10m"
+      stream: true
+      temperature: 0.1
+      max_tokens: 4096
+      top_p: 0.9
+      request_timeout: 300
+
+  - model_name: "claude-fallback"
+    litellm_params:
+      model: "claude-3-5-sonnet-20241022"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+      max_tokens: 4096
+
+litellm_settings:
+  fallbacks:
+    - {"qwen-coder": ["claude-fallback"]}
+  num_retries: 3
+  request_timeout: 300
+  drop_params: true
+  set_verbose: false
+
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  port: 4000
+  host: "0.0.0.0"
+  max_budget: 100
+  budget_duration: "30d"

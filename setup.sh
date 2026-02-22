@@ -216,42 +216,7 @@ YAML
 fi
 
 ###############################################################################
-<<<<<<< HEAD
-# 5. Start Ollama container and pull model
-###############################################################################
-cd "$SCRIPT_DIR"
-info "Pulling latest images..."
-docker compose pull --quiet
-
-info "Starting Ollama container..."
-docker compose up -d ollama
-
-info "Waiting for Ollama to be ready..."
-for i in $(seq 1 30); do
-  if docker compose exec -T ollama ollama list &>/dev/null; then
-    success "Ollama is ready."
-    break
-  fi
-  sleep 2
-  if [[ "$i" -eq 30 ]]; then
-    error "Ollama did not become ready in time. Check logs: docker compose logs ollama"
-  fi
-done
-
-# Pull Qwen model if not already present in the volume
-if docker compose exec -T ollama ollama list 2>/dev/null | grep -q "qwen2.5-coder:14b"; then
-  success "Model '$QWEN_MODEL' already present."
-else
-  info "Pulling '$QWEN_MODEL' — this may take several minutes (~8 GB)..."
-  docker compose exec -T ollama ollama pull "$QWEN_MODEL"
-  success "Model '$QWEN_MODEL' downloaded."
-fi
-
-###############################################################################
-# 6. Start LiteLLM
-=======
 # 8. Start LiteLLM via Docker Compose
->>>>>>> parent of 090f96f (modified for docker)
 ###############################################################################
 info "Starting LiteLLM container..."
 cd "$SCRIPT_DIR"

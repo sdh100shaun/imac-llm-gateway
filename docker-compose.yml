@@ -1,22 +1,19 @@
 services:
-<<<<<<< HEAD
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+  redis:
+    image: redis:7-alpine
+    container_name: litellm-redis
     ports:
-      - "11434:11434"
+      - "6379:6379"
     volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
+      - redis_data:/data
+    command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
-=======
->>>>>>> parent of 090f96f (modified for docker)
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
@@ -27,9 +24,11 @@ services:
     env_file:
       - .env
     command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
-    # Allows the container to reach Ollama running natively on the host
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 15s
@@ -37,3 +36,7 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local

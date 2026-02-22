@@ -23,7 +23,12 @@ litellm_settings:
   request_timeout: 300
   drop_params: true
   set_verbose: false
-
+  cache: true
+  cache_params: # cache_params are optional
+    type: "redis" 
+    host: "host.docker.internal"
+    port: 6379
+  
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   port: 4000

@@ -19,16 +19,27 @@ model_list:
 litellm_settings:
   fallbacks:
     - {"qwen-coder": ["claude-fallback"]}
+  context_window_fallbacks:
+    - {"qwen-coder": ["claude-fallback"]}
   num_retries: 3
   request_timeout: 300
   drop_params: true
   set_verbose: false
+
+  # Redis cache — host "redis" resolves via Docker network (same compose stack)
   cache: true
-  cache_params: # cache_params are optional
-    type: "redis" 
-    host: "host.docker.internal"
+  cache_params:
+    type: "redis"
+    host: "redis"
     port: 6379
-  
+    ttl: 3600               # cache responses for 1 hour
+    namespace: "litellm"    # prefix all cache keys
+    supported_call_types:
+      - "acompletion"
+      - "completion"
+      - "embedding"
+      - "aembedding"
+
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   port: 4000

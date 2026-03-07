@@ -6,16 +6,25 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    # Cache-optimised: LRU eviction, 512 MB cap, no disk persistence
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+      --loglevel warning
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 15s
+      interval: 10s
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    networks:
+      - llm-net
 
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-stable
     container_name: litellm-gateway
     ports:
       - "4000:4000"
@@ -23,7 +32,11 @@ services:
       - ./config.yaml:/app/config.yaml:ro
     env_file:
       - .env
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    environment:
+      # Explicit Redis coords so LiteLLM SDK can also pick them up
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -36,6 +49,12 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - llm-net
+
+networks:
+  llm-net:
+    driver: bridge
 
 volumes:
   redis_data:
